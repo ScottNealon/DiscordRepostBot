@@ -11,6 +11,7 @@ import os
 import sqlite3
 import time
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 
 import discord
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 databases: dict[int, sqlite3.Connection] = {}
 databases_dir_path = Path(os.path.dirname(os.path.realpath(__file__))).joinpath("databases")
-current_database_version = "0.0.1"
+current_database_version = "0.0.3"
 
 # Read commands for creating a new database
 with open(Path(os.path.dirname(os.path.realpath(__file__))).joinpath("new_database.sql"), "r") as file_handle:
@@ -34,7 +35,7 @@ def create_database_connection(guild: discord.Guild):
     if is_new_database:
         logger.info(f'Creating new database for guild "{guild}".')
     databases[guild.id] = sqlite3.connect(database_path)
-    if not is_valid_database(guild, new=True):
+    if not is_valid_database(guild, new=is_new_database):
         create_database(guild)
 
 
@@ -60,15 +61,14 @@ def create_database(guild: discord.Guild):
 
 def is_valid_database(guild: discord.Guild, new: bool):
     try:
-        return get_version(guild) == current_database_version
+        correct_version = get_version(guild) == current_database_version
     except sqlite3.OperationalError as error:
-        if not new:
-            logger.warning(f'Invalid database for guild "{guild}". Creating new database.')
-        return False
+        correct_version = False
     except TypeError as error:
-        if not new:
-            logger.warning(f'Invalid database for guild "{guild}". Creating new database.')
-        return False
+        correct_version = False
+    if not correct_version:
+        logger.warning(f'Invalid database for guild "{guild}". Creating new database.')
+    return correct_version
 
 
 def get_prefix_wrapper(bot: Bot, message: discord.Message) -> str:
@@ -76,36 +76,96 @@ def get_prefix_wrapper(bot: Bot, message: discord.Message) -> str:
     return get_prefix(message.guild)
 
 
-async def review_messages(guild: discord.Guild):
+async def review_messages(guild: discord.Guild, bot: discord.Client):
     """Reviews all messages in guild since last update"""
-    logger.debug(f"Updating channels in {guild}.")
+    logger.info(f"Updating channels in {guild}.")
     last_updated = datetime.fromtimestamp(get_last_updated(guild))
     blacklisted_channels = get_blacklisted_channels(guild)
     # Iterate across all text channels in guild
-    for i, channel in enumerate(guild.channels):
+    for channel in guild.channels:
 
         # Skip non-text channels
         if not isinstance(channel, discord.TextChannel):
-            logger.debug(f"{i}: {channel} is not a text channel.")
+            logger.info(f"{guild}/#{channel} is not a text channel.")
             continue
 
         # Skip blacklisted channels
         if channel.id in blacklisted_channels:
-            logger.warning(f"{i}: {channel} is blacklisted.")
+            logger.warning(f"{guild}/#{channel} is blacklisted.")
             continue
 
-        logger.info(f"{i}: {channel}")
+        logger.info(f"{guild}/#{channel}")
 
-        # Iterate across all messages in channel since time_ago
+        # Iterate across all messages in channel since last updated
         try:
             async for message in channel.history(after=last_updated, limit=None, oldest_first=True):
-                check_message(message)
+                review_message(message, bot)
 
         # Catch error incase unable to access channel
         except discord.Forbidden:
-            logger.warning(f"{i}: {channel} cannot be accessed.")
+            logger.warning(f"{guild}/#{channel} cannot be accessed.")
 
-def check_message(message: discord.Message):
+
+class URL_STATUS(Enum):
+    NEW = 0
+    REPOST = 1
+    REVERSE_REPOST = 2
+
+
+def review_message(message: discord.Message, bot: discord.Client):
+    """Reviews individual message to check for repost"""
+
+    # Skip any message from self, bot, or starting with recognized command
+    if (
+        message.author == bot.user
+        or message.author.bot
+        or message.content.lower().startswith(get_prefix(message.guild))
+    ):
+        return
+
+    # Search through every embed for a URL
+    for embed in message.embeds:
+        if embed.url == discord.Embed.Empty:
+            continue
+
+        url_status = check_if_repost(embed.url, message)
+
+        log_message = f"{message.guild}/#{message.channel} at {message.created_at} by {message.author}: {embed.url}"
+        if url_status == URL_STATUS.NEW:
+            logger.debug(f"New URL found: {log_message}")
+            add_new_url(message)
+        elif url_status == URL_STATUS.REPOST:
+            logger.debug(f"Repost found: {log_message}")
+            mark_repost(message)
+        elif url_status == URL_STATUS.REVERSE_REPOST:
+            logger.debug(f"Reverse repose found: {log_message}")
+            handle_reverse_repost(message)
+        else:
+            raise ValueError("Invalid URL status returned.")
+
+
+def check_if_repost(url: str, message: discord.Message) -> int:
+    """Returns whether URL is a repose or not"""
+    # Check if URL has been posted before
+    _, query_timestamp = check_url(url, message.guild)
+    if query_timestamp is not None:
+        if query_timestamp < message.created_at.timestamp():
+            return URL_STATUS.REPOST
+        else:
+            return URL_STATUS.REVERSE_REPOST
+    else:
+        return URL_STATUS.NEW
+
+
+def mark_repost(message: discord.Message):
+    pass
+
+
+def handle_reverse_repost(message: discord.Message):
+    pass
+
+
+def add_new_url(message: discord.Message):
     pass
 
 
@@ -124,5 +184,13 @@ def get_last_updated(guild: discord.Guild) -> float:
 def get_active(guild: discord.Guild) -> bool:
     return bool(databases[guild.id].execute("SELECT active FROM active").fetchone()[0])
 
+
 def get_blacklisted_channels(guild: discord.Guild) -> tuple[str]:
     return databases[guild.id].execute("SELECT channelID FROM blacklistedChannels").fetchall()
+
+
+def check_url(url: str, guild: discord.Guild) -> tuple[int, float]:
+    url_data = databases[guild.id].execute(f'SELECT messageID, timestamp FROM urls WHERE url = "{url}"').fetchone()
+    if url_data == None:
+        url_data = (None, None)
+    return url_data

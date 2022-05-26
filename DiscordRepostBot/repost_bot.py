@@ -26,7 +26,7 @@ async def on_ready():
     # For each guild, open or create a database
     for guild in bot.guilds:
         guild_database.create_database_connection(guild)
-        await guild_database.review_messages(guild)
+        await guild_database.review_messages(guild, bot)
 
     bot.ready = True
     logger.info("Ready.")
