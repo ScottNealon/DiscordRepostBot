@@ -109,6 +109,7 @@ class URL_STATUS(Enum):
     NEW = 0
     REPOST = 1
     REVERSE_REPOST = 2
+    ALREADY_REPORTED = 3
 
 
 def review_message(message: discord.Message, bot: discord.Client):
@@ -132,13 +133,15 @@ def review_message(message: discord.Message, bot: discord.Client):
         log_message = f"{message.guild}/#{message.channel} at {message.created_at} by {message.author}: {embed.url}"
         if url_status == URL_STATUS.NEW:
             logger.debug(f"New URL found: {log_message}")
-            add_new_url(message)
+            add_new_url(embed.url, message)
         elif url_status == URL_STATUS.REPOST:
-            logger.debug(f"Repost found: {log_message}")
+            logger.debug(f"Reposted URL found: {log_message}")
             mark_repost(message)
         elif url_status == URL_STATUS.REVERSE_REPOST:
-            logger.debug(f"Reverse repose found: {log_message}")
+            logger.debug(f"Reverse repost URL found: {log_message}")
             handle_reverse_repost(message)
+        elif url_status == URL_STATUS.ALREADY_REPORTED:
+            logger.debug(f"Already reported URL found: {log_message}")
         else:
             raise ValueError("Invalid URL status returned.")
 
@@ -146,14 +149,16 @@ def review_message(message: discord.Message, bot: discord.Client):
 def check_if_repost(url: str, message: discord.Message) -> int:
     """Returns whether URL is a repose or not"""
     # Check if URL has been posted before
-    _, query_timestamp = check_url(url, message.guild)
-    if query_timestamp is not None:
-        if query_timestamp < message.created_at.timestamp():
+    message_id, query_timestamp = check_url(url, message.guild)
+    if query_timestamp is None:
+        return URL_STATUS.NEW
+    elif message_id == message.id:
+        return URL_STATUS.ALREADY_REPORTED
+    elif query_timestamp < message.created_at.timestamp():
             return URL_STATUS.REPOST
         else:
             return URL_STATUS.REVERSE_REPOST
-    else:
-        return URL_STATUS.NEW
+        
 
 
 def mark_repost(message: discord.Message):
