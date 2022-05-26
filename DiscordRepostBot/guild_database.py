@@ -155,9 +155,9 @@ def check_if_repost(url: str, message: discord.Message) -> int:
     elif message_id == message.id:
         return URL_STATUS.ALREADY_REPORTED
     elif query_timestamp < message.created_at.timestamp():
-            return URL_STATUS.REPOST
-        else:
-            return URL_STATUS.REVERSE_REPOST
+        return URL_STATUS.REPOST
+    else:
+        return URL_STATUS.REVERSE_REPOST
         
 
 
@@ -169,8 +169,13 @@ def handle_reverse_repost(message: discord.Message):
     pass
 
 
-def add_new_url(message: discord.Message):
-    pass
+def add_new_url(url, message: discord.Message):
+    """Save new url to database"""
+    databases[message.guild.id].execute(
+        "INSERT INTO urls (url, messageID, timestamp) VALUES (:url, :messageID, :timestamp)",
+        {"url": url, "messageID": message.id, "timestamp": message.created_at.timestamp()},
+    )
+    databases[message.guild.id].commit()
 
 
 def get_prefix(guild: discord.Guild) -> str:
