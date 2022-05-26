@@ -21,6 +21,10 @@ databases: dict[int, sqlite3.Connection] = {}
 databases_dir_path = Path(os.path.dirname(os.path.realpath(__file__))).joinpath("databases")
 current_database_version = "0.0"
 
+# Read commands for creating a new database
+with open(Path(os.path.dirname(os.path.realpath(__file__))).joinpath("new_database.sql"), "r") as file_handle:
+    new_database_sql_commands = file_handle.read()
+
 
 def create_database_connection(guild: discord.Guild):
     """Creates a database connection to guild, populating as necessary"""
@@ -29,9 +33,7 @@ def create_database_connection(guild: discord.Guild):
     if is_new_database:
         logger.info(f'Creating new database for guild "{guild}".')
     databases[guild.id] = sqlite3.connect(database_path)
-    if not is_valid_database(guild):
-        if not is_new_database:
-            logger.info(f'Invalid database for guild "{guild}". Creating new database.')
+    if not is_valid_database(guild, new=True):
         create_database(guild)
 
 
@@ -42,86 +44,36 @@ def create_database(guild: discord.Guild):
     database_path = databases_dir_path.joinpath(f"{guild.id}.sqlite3")
     os.remove(database_path)
     databases[guild.id] = sqlite3.connect(database_path)
-    # Populate database
-    databases[guild.id].execute(
-        """
-        CREATE TABLE version(
-            version VARCHAR NOT NULL
-        );
-        """
-    )
-    databases[guild.id].execute(
-        f"""
-        INSERT INTO version
-            (version)
-        VALUES
-            ("{current_database_version}");
-        """
-    )
-    databases[guild.id].execute(
-        """
-        CREATE TABLE updates(
-            oldestUpdate FLOAT NOT NULL,
-            newestUpdate FLOAT NOT NULL
-        );
-        """
-    )
+    # Replace commands
     now = time.time()
-    databases[guild.id].execute(
-        f"""
-        INSERT INTO updates
-            (oldestUpdate, lastUpdate)
-        VALUES
-            ({now}, {now});
-        """
+    new_database_sql_commands
+    updated_database_sql_commands = new_database_sql_commands.format_map(
+        {"current_database_version": current_database_version, " now ": now}
     )
-    databases[guild.id].execute(
-        """
-        CREATE TABLE prefix(
-            prefix VARCHAR NOT NULL
-        );
-        """
-    )
-    databases[guild.id].execute(
-        f"""
-        INSERT INTO prefix
-            (prefix)
-        VALUES
-            ("$repost");
-        """
-    )
-    databases[guild.id].execute(
-        """
-        CREATE TABLE active(
-            active INT NOT NULL
-        );
-        """
-    )
-    databases[guild.id].execute(
-        f"""
-        INSERT INTO active
-            (active)
-        VALUES
-            (1);
-        """
-    )
+    # Run commands
+    for command in updated_database_sql_commands.split(";"):
+        databases[guild.id].execute(command)
     # Commit
     databases[guild.id].commit()
 
 
-def is_valid_database(guild: discord.Guild):
+def is_valid_database(guild: discord.Guild, new: bool):
     try:
-        database_version = (
-            databases[guild.id].execute('SELECT version FROM version').fetchone()
-        )[0]
-        return database_version == current_database_version
+        return get_version(guild) == current_database_version
     except sqlite3.OperationalError as error:
+        if not new:
+            logger.warning(f'Invalid database for guild "{guild}". Creating new database.')
+        return False
+    except TypeError as error:
+        if not new:
+            logger.warning(f'Invalid database for guild "{guild}". Creating new database.')
         return False
 
 
 def get_prefix_wrapper(bot: Bot, message: discord.Message) -> str:
     """Determines which prefix to use based on server preferences"""
     return get_prefix(message.guild)
+
 
 def review_messages(guild: discord.Guild):
     """Reviews all messages in guild since last update"""
@@ -132,10 +84,16 @@ def review_messages(guild: discord.Guild):
 
 
 def get_prefix(guild: discord.Guild) -> str:
-    return databases[guild.id].execute("SELECT prefix from prefix").fetchone()[0]
+    return databases[guild.id].execute("SELECT prefix FROM prefix").fetchone()[0]
+
+
+def get_version(guild: discord.Guild) -> str:
+    return databases[guild.id].execute("SELECT version FROM version").fetchone()[0]
+
 
 def get_last_updated(guild: discord.Guild) -> float:
-    return databases[guild.id].execute("SELECT lastUpdate from updates").fetchone()[0]
+    return databases[guild.id].execute("SELECT lastUpdate FROM updates").fetchone()[0]
+
 
 def get_active(guild: discord.Guild) -> bool:
-    return bool(databases[guild.id].execute("SELECT active from active").fetchone()[0])
+    return bool(databases[guild.id].execute("SELECT active FROM active").fetchone()[0])
