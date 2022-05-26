@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 databases: dict[int, sqlite3.Connection] = {}
 databases_dir_path = Path(os.path.dirname(os.path.realpath(__file__))).joinpath("databases")
-current_database_version = "0.0.3"
+current_database_version = 1
 
 # Read commands for creating a new database
 with open(Path(os.path.dirname(os.path.realpath(__file__))).joinpath("new_database.sql"), "r") as file_handle:
@@ -48,13 +48,12 @@ def create_database(guild: discord.Guild):
     databases[guild.id] = sqlite3.connect(database_path)
     # Replace commands
     now = time.time()
-    new_database_sql_commands
-    updated_database_sql_commands = new_database_sql_commands.format_map(
-        {"current_database_version": current_database_version, " now ": now}
-    )
+    # updated_database_sql_commands = new_database_sql_commands.format_map(
+    #     {"current_database_version": current_database_version, " now ": now}
+    # )
     # Run commands
-    for command in updated_database_sql_commands.split(";"):
-        databases[guild.id].execute(command)
+    for command in new_database_sql_commands.split(";"):
+        databases[guild.id].execute(command, {"current_database_version": current_database_version, "now": now})
     # Commit
     databases[guild.id].commit()
 
@@ -173,7 +172,7 @@ def get_prefix(guild: discord.Guild) -> str:
     return databases[guild.id].execute("SELECT prefix FROM prefix").fetchone()[0]
 
 
-def get_version(guild: discord.Guild) -> str:
+def get_version(guild: discord.Guild) -> int:
     return databases[guild.id].execute("SELECT version FROM version").fetchone()[0]
 
 

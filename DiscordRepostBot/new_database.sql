@@ -1,4 +1,4 @@
-CREATE TABLE version(version VARCHAR NOT NULL);
+CREATE TABLE version(version INT NOT NULL);
 CREATE TABLE updates(
     oldestUpdate FLOAT NOT NULL,
     lastUpdate FLOAT NOT NULL
@@ -14,9 +14,9 @@ CREATE TABLE urls(
 );
 /* Populate tables */
 INSERT INTO version (version)
-VALUES ("{current_database_version}");
+VALUES (:current_database_version);
 INSERT INTO updates (oldestUpdate, lastUpdate)
-VALUES ({ now }, { now });
+VALUES (:now, :now);
 INSERT INTO prefix (prefix)
 VALUES ("$repost");
 INSERT INTO active (active)
