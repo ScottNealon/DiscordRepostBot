@@ -62,7 +62,7 @@ def create_database(guild: discord.Guild):
     databases[guild.id].execute(
         f"""
         INSERT INTO updates
-            (oldestUpdate, newestUpdate)
+            (oldestUpdate, lastUpdate)
         VALUES
             ({now}, {now});
         """
@@ -79,7 +79,22 @@ def create_database(guild: discord.Guild):
         INSERT INTO prefix
             (prefix)
         VALUES
-            ("!");
+            ("$repost");
+        """
+    )
+    databases[guild.id].execute(
+        """
+        CREATE TABLE active(
+            active INT NOT NULL
+        );
+        """
+    )
+    databases[guild.id].execute(
+        f"""
+        INSERT INTO active
+            (active)
+        VALUES
+            (1);
         """
     )
     # Commit
@@ -96,9 +111,23 @@ def is_valid_database(guild: discord.Guild):
         return False
 
 
-def get_prefix(bot: Bot, message: discord.Message) -> str:
+def get_prefix_wrapper(bot: Bot, message: discord.Message) -> str:
     """Determines which prefix to use based on server preferences"""
-    sql_table = databases[message.guild.id]
-    query = "SELECT prefix FROM prefix"
-    prefix = sql_table.execute(query).fetchone()[0]
-    return prefix
+    return get_prefix(message.guild)
+
+def review_messages(guild: discord.Guild):
+    """Reviews all messages in guild since last update"""
+    now = time.time()
+    last_updated = get_last_updated(guild)
+    pass
+
+
+
+def get_prefix(guild: discord.Guild) -> str:
+    return databases[guild.id].execute("SELECT prefix from prefix").fetchone()[0]
+
+def get_last_updated(guild: discord.Guild) -> float:
+    return databases[guild.id].execute("SELECT lastUpdate from updates").fetchone()[0]
+
+def get_active(guild: discord.Guild) -> bool:
+    return bool(databases[guild.id].execute("SELECT active from active").fetchone()[0])

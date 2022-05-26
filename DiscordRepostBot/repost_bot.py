@@ -33,6 +33,12 @@ async def on_ready():
 
 @bot.event
 async def on_message(message: discord.Message):
-    # Not nothing if bot is not ready
+    # Do nothing if bot is not ready
     if not bot.ready:
+        return
+    # Do nothing if inactive in server
+    if not guild_database.get_active(message.guild):
+        return
+    # Do not trigger on self or bots
+    if message.author == bot or message.author.bot:
         return
