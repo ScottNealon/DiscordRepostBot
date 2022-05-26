@@ -10,6 +10,7 @@ import logging
 import os
 import sqlite3
 import time
+from datetime import datetime
 from pathlib import Path
 
 import discord
@@ -19,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 databases: dict[int, sqlite3.Connection] = {}
 databases_dir_path = Path(os.path.dirname(os.path.realpath(__file__))).joinpath("databases")
-current_database_version = "0.0"
+current_database_version = "0.0.1"
 
 # Read commands for creating a new database
 with open(Path(os.path.dirname(os.path.realpath(__file__))).joinpath("new_database.sql"), "r") as file_handle:
@@ -75,12 +76,37 @@ def get_prefix_wrapper(bot: Bot, message: discord.Message) -> str:
     return get_prefix(message.guild)
 
 
-def review_messages(guild: discord.Guild):
+async def review_messages(guild: discord.Guild):
     """Reviews all messages in guild since last update"""
-    now = time.time()
-    last_updated = get_last_updated(guild)
-    pass
+    logger.debug(f"Updating channels in {guild}.")
+    last_updated = datetime.fromtimestamp(get_last_updated(guild))
+    blacklisted_channels = get_blacklisted_channels(guild)
+    # Iterate across all text channels in guild
+    for i, channel in enumerate(guild.channels):
 
+        # Skip non-text channels
+        if not isinstance(channel, discord.TextChannel):
+            logger.debug(f"{i}: {channel} is not a text channel.")
+            continue
+
+        # Skip blacklisted channels
+        if channel.id in blacklisted_channels:
+            logger.warning(f"{i}: {channel} is blacklisted.")
+            continue
+
+        logger.info(f"{i}: {channel}")
+
+        # Iterate across all messages in channel since time_ago
+        try:
+            async for message in channel.history(after=last_updated, limit=None, oldest_first=True):
+                check_message(message)
+
+        # Catch error incase unable to access channel
+        except discord.Forbidden:
+            logger.warning(f"{i}: {channel} cannot be accessed.")
+
+def check_message(message: discord.Message):
+    pass
 
 
 def get_prefix(guild: discord.Guild) -> str:
@@ -97,3 +123,6 @@ def get_last_updated(guild: discord.Guild) -> float:
 
 def get_active(guild: discord.Guild) -> bool:
     return bool(databases[guild.id].execute("SELECT active FROM active").fetchone()[0])
+
+def get_blacklisted_channels(guild: discord.Guild) -> tuple[str]:
+    return databases[guild.id].execute("SELECT channelID FROM blacklistedChannels").fetchall()

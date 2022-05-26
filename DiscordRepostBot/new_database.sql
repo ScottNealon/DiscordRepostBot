@@ -13,3 +13,4 @@ VALUES ("$repost");
 CREATE TABLE active(active INT NOT NULL);
 INSERT INTO active (active)
 VALUES (1);
+CREATE TABLE blacklistedChannels(channelID INT NOT NULL);
