@@ -5,8 +5,8 @@ messages when a duplicate URL is sent to a discord server.
 
 Author: Scott Nealon
 """
-
 import logging
+import time
 
 import discord
 from discord.ext.commands import Bot
@@ -34,9 +34,9 @@ async def on_ready():
 
 @bot.event
 async def on_message(message: discord.Message):
-    # Do nothing if bot is not ready
-    if not bot.ready:
-        return
+    # Wait until the bot is ready to read messages
+    while not bot.ready:
+        time.sleep(5)
     # Do nothing if inactive in server
     if not guild_database.get_active(message.guild):
         return
