@@ -6,6 +6,7 @@ CREATE TABLE updates(
 CREATE TABLE prefix(prefix VARCHAR NOT NULL);
 CREATE TABLE active(active INT NOT NULL);
 CREATE TABLE blacklistedChannels(channelID INT NOT NULL);
+CREATE TABLE emoji(emoji VARCHAR NOT NULL);
 CREATE TABLE urls(
     url VARCHAR NOT NULL,
     messageID INT NOT NULL,
@@ -21,3 +22,5 @@ INSERT INTO prefix (prefix)
 VALUES ("$repost");
 INSERT INTO active (active)
 VALUES (1);
+INSERT INTO emoji (emoji)
+VALUES ("recycle")

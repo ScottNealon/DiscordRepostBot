@@ -13,15 +13,17 @@ import time
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
+from typing import Union
 
 import discord
+import emoji as emoji_library
 from discord.ext.commands import Bot
 
 logger = logging.getLogger(__name__)
 
 databases: dict[int, sqlite3.Connection] = {}
 databases_dir_path = Path(os.path.dirname(os.path.realpath(__file__))).joinpath("databases")
-current_database_version = 1
+current_database_version = 3
 
 # Read commands for creating a new database
 with open(Path(os.path.dirname(os.path.realpath(__file__))).joinpath("new_database.sql"), "r") as file_handle:
@@ -98,7 +100,7 @@ async def review_messages(guild: discord.Guild, bot: discord.Client):
         # Iterate across all messages in channel since last updated
         try:
             async for message in channel.history(after=last_updated, limit=None, oldest_first=True):
-                review_message(message, bot)
+                await review_message(message, bot)
 
         # Catch error incase unable to access channel
         except discord.Forbidden:
@@ -112,7 +114,7 @@ class URL_STATUS(Enum):
     ALREADY_REPORTED = 3
 
 
-def review_message(message: discord.Message, bot: discord.Client):
+async def review_message(message: discord.Message, bot: discord.Client):
     """Reviews individual message to check for repost"""
 
     # Skip any message from self, bot, or starting with recognized command
@@ -136,7 +138,7 @@ def review_message(message: discord.Message, bot: discord.Client):
             add_new_url(embed.url, message)
         elif url_status == URL_STATUS.REPOST:
             logger.debug(f"Reposted URL found: {log_message}")
-            mark_repost(message)
+            await mark_repost(message, bot)
         elif url_status == URL_STATUS.REVERSE_REPOST:
             logger.debug(f"Reverse repost URL found: {log_message}")
             handle_reverse_repost(message)
@@ -158,11 +160,9 @@ def check_if_repost(url: str, message: discord.Message) -> int:
         return URL_STATUS.REPOST
     else:
         return URL_STATUS.REVERSE_REPOST
-        
 
-
-def mark_repost(message: discord.Message):
-    pass
+async def mark_repost(message: discord.Message, bot: discord.Client):
+    await message.add_reaction(get_discord_emoji(message.guild, bot))
 
 
 def handle_reverse_repost(message: discord.Message):
@@ -203,3 +203,19 @@ def check_url(url: str, guild: discord.Guild) -> tuple[int, float]:
     if url_data == None:
         url_data = (None, None)
     return url_data
+
+def get_emoji_str(guild: discord.Guild) -> Union[str, discord.Emoji]:
+    return databases[guild.id].execute("SELECT emoji FROM emoji").fetchone()[0]    
+
+def get_discord_emoji(guild: discord.Guild, bot: discord.Client) -> discord.Emoji:
+    # Get emoji string from database
+    emoji_str = get_emoji_str(guild)
+    # Attempt to correlate with custom emoji
+    for emoji in bot.emojis:
+        if emoji.name == emoji_str:
+            return emoji
+    else:
+        try:
+            return emoji_library.EMOJI_ALIAS_UNICODE_ENGLISH[f":{emoji_str}:"]
+        except:
+            raise ValueError(f"{emoji_str} not found in client's emojis or unicode.")
