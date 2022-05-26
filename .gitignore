@@ -127,3 +127,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Discord bot token
+bot_token.env
+
+# sqlite3
+*.sqlite3
