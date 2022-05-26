@@ -15,8 +15,9 @@ import guild_database
 
 logger = logging.getLogger(__name__)
 
-bot = Bot(guild_database.get_prefix)
-
+# Create bot
+intents = discord.Intents(messages=True, guilds=True, members=True)
+bot = Bot(command_prefix=guild_database.get_prefix, intents=intents)
 bot.ready = False
 
 

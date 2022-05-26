@@ -13,6 +13,11 @@ CREATE TABLE urls(
     timestamp FLOAT NOT NULL,
     PRIMARY KEY (url)
 );
+CREATE TABLE members(
+    ID INT NOT NULL,
+    name VARCHAR NOT NULL,
+    PRIMARY KEY (ID)
+);
 /* Populate tables */
 INSERT INTO version (version)
 VALUES (:current_database_version);

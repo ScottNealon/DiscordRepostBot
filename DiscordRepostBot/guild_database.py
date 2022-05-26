@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 databases: dict[int, sqlite3.Connection] = {}
 databases_dir_path = Path(os.path.dirname(os.path.realpath(__file__))).joinpath("databases")
-current_database_version = 3
+current_database_version = 5
 
 # Read commands for creating a new database
 with open(Path(os.path.dirname(os.path.realpath(__file__))).joinpath("new_database.sql"), "r") as file_handle:
@@ -48,14 +48,12 @@ def create_database(guild: discord.Guild):
     database_path = databases_dir_path.joinpath(f"{guild.id}.sqlite3")
     os.remove(database_path)
     databases[guild.id] = sqlite3.connect(database_path)
-    # Replace commands
-    now = time.time()
-    # updated_database_sql_commands = new_database_sql_commands.format_map(
-    #     {"current_database_version": current_database_version, " now ": now}
-    # )
     # Run commands
+    now = time.time()
     for command in new_database_sql_commands.split(";"):
         databases[guild.id].execute(command, {"current_database_version": current_database_version, "now": now})
+    for member in guild.members:
+        add_member(member, guild)
     # Commit
     databases[guild.id].commit()
 
@@ -67,7 +65,7 @@ def is_valid_database(guild: discord.Guild, new: bool):
         correct_version = False
     except TypeError as error:
         correct_version = False
-    if not correct_version:
+    if not correct_version and not new:
         logger.warning(f'Invalid database for guild "{guild}". Creating new database.')
     return correct_version
 
@@ -84,24 +82,19 @@ async def review_messages(guild: discord.Guild, bot: discord.Client):
     blacklisted_channels = get_blacklisted_channels(guild)
     # Iterate across all text channels in guild
     for channel in guild.channels:
-
         # Skip non-text channels
         if not isinstance(channel, discord.TextChannel):
             logger.info(f"{guild}/#{channel} is not a text channel.")
             continue
-
         # Skip blacklisted channels
         if channel.id in blacklisted_channels:
             logger.warning(f"{guild}/#{channel} is blacklisted.")
             continue
-
         logger.info(f"{guild}/#{channel}")
-
         # Iterate across all messages in channel since last updated
         try:
             async for message in channel.history(after=last_updated, limit=None, oldest_first=True):
                 await review_message(message, bot)
-
         # Catch error incase unable to access channel
         except discord.Forbidden:
             logger.warning(f"{guild}/#{channel} cannot be accessed.")
@@ -116,7 +109,6 @@ class URL_STATUS(Enum):
 
 async def review_message(message: discord.Message, bot: discord.Client):
     """Reviews individual message to check for repost"""
-
     # Skip any message from self, bot, or starting with recognized command
     if (
         message.author == bot.user
@@ -124,15 +116,14 @@ async def review_message(message: discord.Message, bot: discord.Client):
         or message.content.lower().startswith(get_prefix(message.guild))
     ):
         return
-
     # Search through every embed for a URL
     for embed in message.embeds:
         if embed.url == discord.Embed.Empty:
             continue
-
+        # Check repost status
         url_status = check_if_repost(embed.url, message)
-
         log_message = f"{message.guild}/#{message.channel} at {message.created_at} by {message.author}: {embed.url}"
+        # Deal with message according to status
         if url_status == URL_STATUS.NEW:
             logger.debug(f"New URL found: {log_message}")
             add_new_url(embed.url, message)
@@ -219,3 +210,9 @@ def get_discord_emoji(guild: discord.Guild, bot: discord.Client) -> discord.Emoj
             return emoji_library.EMOJI_ALIAS_UNICODE_ENGLISH[f":{emoji_str}:"]
         except:
             raise ValueError(f"{emoji_str} not found in client's emojis or unicode.")
+
+def add_member(member: discord.Member, guild: discord.Guild):
+    databases[guild.id].execute(
+        "INSERT INTO members (ID, name) VALUES (:ID, :name)",
+        {"ID": member.id, "name": member.name},
+    )
