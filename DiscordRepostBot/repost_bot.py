@@ -41,6 +41,6 @@ async def on_message(message: discord.Message):
     # Do nothing if inactive in server
     if not guild_database.get_active(message.guild):
         return
-    # Do not trigger on self or bots
-    if message.author == bot or message.author.bot:
+    # Do not trigger on bots
+    if message.author.bot:
         return
