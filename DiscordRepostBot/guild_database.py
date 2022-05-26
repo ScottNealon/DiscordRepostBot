@@ -1,3 +1,11 @@
+"""guild_database 
+
+This module contains the sql database connection and functions necessary to run the repost bot for each individual
+guild.
+
+Author: Scott Nealon
+"""
+
 import logging
 import os
 import sqlite3
