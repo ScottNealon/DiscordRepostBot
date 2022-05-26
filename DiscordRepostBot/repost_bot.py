@@ -17,16 +17,22 @@ logger = logging.getLogger(__name__)
 
 bot = Bot(guild_database.get_prefix)
 
+bot.ready = False
+
 
 @bot.event
 async def on_ready():
-    logger.info("Ready.")
 
     # For each guild, open or create a database
     for guild in bot.guilds:
         guild_database.create_database_connection(guild)
 
+    bot.ready = True
+    logger.info("Ready.")
+
 
 @bot.event
 async def on_message(message: discord.Message):
-    pass
+    # Not nothing if bot is not ready
+    if not bot.ready:
+        return
