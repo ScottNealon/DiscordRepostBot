@@ -117,7 +117,7 @@ class RepostBot(discord.ext.commands.Bot):
         # Check if URL has been posted before
         try:
             message_id, channel_id, query_timestamp = self.guild_databases[message.guild].get_url(url)
-            if message_id == message.id:
+            if message_id == message.id and channel_id == message.channel.id:
                 return URL_STATUS.ALREADY_REPORTED
             elif query_timestamp < message.created_at.timestamp():
                 return URL_STATUS.REPOST
