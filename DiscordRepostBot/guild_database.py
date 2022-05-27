@@ -159,7 +159,13 @@ class GuildDatabase:
     def add_repost(self, url: str, message: discord.Message):
         self.connection.execute(
             sql_queries["add_repost"],
-            {"messageID": message.id, "channelID": message.channel.id, "memberID": message.author.id, "url": url},
+            {
+                "messageID": message.id,
+                "channelID": message.channel.id,
+                "memberID": message.author.id,
+                "timestamp": message.created_at.timestamp(),
+                "url": url,
+            },
         )
 
     def remove_repost(self, url: str, message: discord.Message):

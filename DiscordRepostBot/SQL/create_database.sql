@@ -19,6 +19,7 @@ CREATE TABLE reposts(
     messageID INT NOT NULL,
     channelID INT NOT NULL,
     memberID INT NOT NULL,
+    timestamp FLOAT NOT NULL,
     url VARCHAR NOT NULL,
     FOREIGN KEY (memberID) REFERENCES members(id),
     FOREIGN KEY (url) REFERENCES urls(url)
