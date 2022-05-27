@@ -1,0 +1,1 @@
+SELECT messageID, channelID, timestamp FROM urls;

@@ -1,0 +1,1 @@
+SELECT emoji FROM emoji;

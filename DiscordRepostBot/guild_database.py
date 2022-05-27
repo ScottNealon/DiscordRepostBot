@@ -11,208 +11,201 @@ import os
 import sqlite3
 import time
 from datetime import datetime
-from enum import Enum
 from pathlib import Path
 from typing import Union
 
 import discord
+import discord.ext.commands
 import emoji as emoji_library
-from discord.ext.commands import Bot
 
 logger = logging.getLogger(__name__)
 
-databases: dict[int, sqlite3.Connection] = {}
-databases_dir_path = Path(os.path.dirname(os.path.realpath(__file__))).joinpath("databases")
-current_database_version = 5
-
-# Read commands for creating a new database
-with open(Path(os.path.dirname(os.path.realpath(__file__))).joinpath("new_database.sql"), "r") as file_handle:
-    new_database_sql_commands = file_handle.read()
-
-
-def create_database_connection(guild: discord.Guild):
-    """Creates a database connection to guild, populating as necessary"""
-    database_path = databases_dir_path.joinpath(f"{guild.id}.sqlite3")
-    is_new_database = not database_path.exists()
-    if is_new_database:
-        logger.info(f'Creating new database for guild "{guild}".')
-    databases[guild.id] = sqlite3.connect(database_path)
-    if not is_valid_database(guild, new=is_new_database):
-        create_database(guild)
+# Read commands
+sql_queries_dir = Path(os.path.dirname(os.path.realpath(__file__))).joinpath("SQL")
+sql_queries: dict[str, str] = {}
+for file in sql_queries_dir.iterdir():
+    if file.suffix == ".sql":
+        with open(file, "r") as file_handle:
+            sql_queries[file.stem] = file_handle.read()
 
 
-def create_database(guild: discord.Guild):
-    """Creates a new guild database"""
-    # Delete and recreate database
-    databases[guild.id].close()
-    database_path = databases_dir_path.joinpath(f"{guild.id}.sqlite3")
-    os.remove(database_path)
-    databases[guild.id] = sqlite3.connect(database_path)
-    # Run commands
-    now = time.time()
-    for command in new_database_sql_commands.split(";"):
-        databases[guild.id].execute(command, {"current_database_version": current_database_version, "now": now})
-    for member in guild.members:
-        add_member(member, guild)
-    # Commit
-    databases[guild.id].commit()
+class GuildDatabase:
 
+    newest_version = 8
 
-def is_valid_database(guild: discord.Guild, new: bool):
-    try:
-        correct_version = get_version(guild) == current_database_version
-    except sqlite3.OperationalError as error:
-        correct_version = False
-    except TypeError as error:
-        correct_version = False
-    if not correct_version and not new:
-        logger.warning(f'Invalid database for guild "{guild}". Creating new database.')
-    return correct_version
+    def __init__(self, guild: discord.Guild, bot: discord.ext.commands.Bot):
+        self.guild = guild
+        self.bot = bot
+        self.path = (
+            Path(os.path.dirname(os.path.realpath(__file__))).joinpath("databases").joinpath(f"{guild.id}.sqlite3")
+        )
+        self._emoji = None
+        self._create_connection()
 
+    def _create_connection(self):
+        """Creates a connection to guild SQLite3 database, populating as necessary"""
+        is_new_database = not self.path.exists()
+        if is_new_database:
+            logger.info(f'Creating new database for guild "{self.guild}".')
+        self.connection = sqlite3.connect(self.path)
+        self.connection.row_factory = sqlite3.Row
+        if not self._is_valid_database(new=is_new_database):
+            self._create_database()
 
-def get_prefix_wrapper(bot: Bot, message: discord.Message) -> str:
-    """Determines which prefix to use based on server preferences"""
-    return get_prefix(message.guild)
-
-
-async def review_messages(guild: discord.Guild, bot: discord.Client):
-    """Reviews all messages in guild since last update"""
-    logger.info(f"Updating channels in {guild}.")
-    last_updated = datetime.fromtimestamp(get_last_updated(guild))
-    blacklisted_channels = get_blacklisted_channels(guild)
-    # Iterate across all text channels in guild
-    for channel in guild.channels:
-        # Skip non-text channels
-        if not isinstance(channel, discord.TextChannel):
-            logger.info(f"{guild}/#{channel} is not a text channel.")
-            continue
-        # Skip blacklisted channels
-        if channel.id in blacklisted_channels:
-            logger.warning(f"{guild}/#{channel} is blacklisted.")
-            continue
-        logger.info(f"{guild}/#{channel}")
-        # Iterate across all messages in channel since last updated
+    def _is_valid_database(self, new: bool) -> bool:
+        """Returns TRUE if able to match version in table, otherwise returns FALSE"""
         try:
-            async for message in channel.history(after=last_updated, limit=None, oldest_first=True):
-                await review_message(message, bot)
-        # Catch error incase unable to access channel
-        except discord.Forbidden:
-            logger.warning(f"{guild}/#{channel} cannot be accessed.")
+            correct_version = self.version == self.newest_version
+        except sqlite3.OperationalError as error:
+            correct_version = False
+        except TypeError as error:
+            correct_version = False
+        if not correct_version and not new:
+            logger.warning(f"Invalid database for {self.guild} ({self.path.name}). Creating new database.")
+        return correct_version
 
+    def _create_database(self):
+        """Creates a new guild SQLite3 database"""
+        # Delete and recreate database
+        self.connection.close()
+        os.remove(self.path)
+        self.connection = sqlite3.connect(self.path)
+        # Run commands
+        now = time.time()
+        for command in sql_queries["create_database"].split(";"):
+            self.connection.execute(command, {"newest_version": self.newest_version, "now": now})
 
-class URL_STATUS(Enum):
-    NEW = 0
-    REPOST = 1
-    REVERSE_REPOST = 2
-    ALREADY_REPORTED = 3
+    ### PROPERTIES ###
 
+    @property
+    def version(self) -> int:
+        return self.connection.execute(sql_queries["get_version"]).fetchone()[0]
 
-async def review_message(message: discord.Message, bot: discord.Client):
-    """Reviews individual message to check for repost"""
-    # Skip any message from self, bot, or starting with recognized command
-    if (
-        message.author == bot.user
-        or message.author.bot
-        or message.content.lower().startswith(get_prefix(message.guild))
-    ):
-        return
-    # Search through every embed for a URL
-    for embed in message.embeds:
-        if embed.url == discord.Embed.Empty:
-            continue
-        # Check repost status
-        url_status = check_if_repost(embed.url, message)
-        log_message = f"{message.guild}/#{message.channel} at {message.created_at} by {message.author}: {embed.url}"
-        # Deal with message according to status
-        if url_status == URL_STATUS.NEW:
-            logger.debug(f"New URL found: {log_message}")
-            add_new_url(embed.url, message)
-        elif url_status == URL_STATUS.REPOST:
-            logger.debug(f"Reposted URL found: {log_message}")
-            await mark_repost(message, bot)
-        elif url_status == URL_STATUS.REVERSE_REPOST:
-            logger.debug(f"Reverse repost URL found: {log_message}")
-            handle_reverse_repost(message)
-        elif url_status == URL_STATUS.ALREADY_REPORTED:
-            logger.debug(f"Already reported URL found: {log_message}")
-        else:
-            raise ValueError("Invalid URL status returned.")
+    @property
+    def prefix(self) -> str:
+        return self.connection.execute(sql_queries["get_prefix"]).fetchone()[0]
 
+    @prefix.setter
+    def set_prefix(self, prefix: str):
+        self.connection.execute(sql_queries["set_prefix"], {"prefix": prefix})
 
-def check_if_repost(url: str, message: discord.Message) -> int:
-    """Returns whether URL is a repose or not"""
-    # Check if URL has been posted before
-    message_id, query_timestamp = check_url(url, message.guild)
-    if query_timestamp is None:
-        return URL_STATUS.NEW
-    elif message_id == message.id:
-        return URL_STATUS.ALREADY_REPORTED
-    elif query_timestamp < message.created_at.timestamp():
-        return URL_STATUS.REPOST
-    else:
-        return URL_STATUS.REVERSE_REPOST
+    @property
+    def last_updated(self) -> float:
+        return self.connection.execute(sql_queries["get_last_updated"]).fetchone()[0]
 
-async def mark_repost(message: discord.Message, bot: discord.Client):
-    await message.add_reaction(get_discord_emoji(message.guild, bot))
+    @property
+    def last_updated_datetime(self) -> datetime:
+        return datetime.fromtimestamp(self.last_updated)
 
+    @last_updated.setter
+    def set_last_updated(self, last_updated: float):
+        self.connection.execute(sql_queries["set_last_updated"], {"lastUpdate": last_updated})
 
-def handle_reverse_repost(message: discord.Message):
-    pass
+    @property
+    def active(self) -> bool:
+        return self.connection.execute(sql_queries["get_active"]).fetchone()[0]
 
+    @active.setter
+    def set_active(self, active: bool):
+        self.connection.execute(sql_queries["set_active"], {"active": active})
 
-def add_new_url(url, message: discord.Message):
-    """Save new url to database"""
-    databases[message.guild.id].execute(
-        "INSERT INTO urls (url, messageID, timestamp) VALUES (:url, :messageID, :timestamp)",
-        {"url": url, "messageID": message.id, "timestamp": message.created_at.timestamp()},
-    )
-    databases[message.guild.id].commit()
+    @property
+    def blacklisted_channels(self):
+        return self.connection.execute(sql_queries["get_blacklisted_channels"]).fetchall()
 
+    def add_blacklisted_channel(self, blacklisted_channel: str):
+        self.connection.execute(sql_queries["add_blacklisted_channel"], {"id": blacklisted_channel})
 
-def get_prefix(guild: discord.Guild) -> str:
-    return databases[guild.id].execute("SELECT prefix FROM prefix").fetchone()[0]
+    def remove_blacklisted_channel(self, blacklisted_channel: str):
+        self.connection.execute(sql_queries["remove_blacklisted_channel"], {"blacklisted_channel": blacklisted_channel})
 
+    @property
+    def members(self) -> tuple[int]:
+        return tuple(member["id"] for member in self.connection.execute(sql_queries["get_members"]).fetchall())
 
-def get_version(guild: discord.Guild) -> int:
-    return databases[guild.id].execute("SELECT version FROM version").fetchone()[0]
+    def add_member(self, member: discord.Member):
+        self.connection.execute(sql_queries["add_member"], {"id": member.id})
 
+    def remove_member(self, member: discord.Member):
+        self.connection.execute(sql_queries["remove_member"], {"id": member.id})
 
-def get_last_updated(guild: discord.Guild) -> float:
-    return databases[guild.id].execute("SELECT lastUpdate FROM updates").fetchone()[0]
+    @property
+    def urls(self):
+        return self.connection.execute(sql_queries["get_urls"]).fetchall()
 
+    def get_url(self, url: str) -> sqlite3.Row:
+        return self.connection.execute(sql_queries["get_url"], {"url": url}).fetchone()
 
-def get_active(guild: discord.Guild) -> bool:
-    return bool(databases[guild.id].execute("SELECT active FROM active").fetchone()[0])
+    def add_url(self, url: str, message: discord.Message):
+        self.connection.execute(
+            sql_queries["add_url"],
+            {
+                "url": url,
+                "messageID": message.id,
+                "channelID": message.channel.id,
+                "timestamp": message.created_at.timestamp(),
+            },
+        )
 
+    def set_url(self, url: str, message: discord.Message):
+        self.connection.execute(
+            sql_queries["set_url"],
+            {
+                "url": url,
+                "messageID": message.id,
+                "channelID": message.channel.id,
+                "timestamp": message.created_at.timestamp(),
+            },
+        )
 
-def get_blacklisted_channels(guild: discord.Guild) -> tuple[str]:
-    return databases[guild.id].execute("SELECT channelID FROM blacklistedChannels").fetchall()
+    def remove_url(self, url: str):
+        self.connection.execute(sql_queries["remove_url"], {"url": url})
 
+    @property
+    def reposts(self):
+        return self.connection.execute(sql_queries["reposts"]).fetchall()
 
-def check_url(url: str, guild: discord.Guild) -> tuple[int, float]:
-    url_data = databases[guild.id].execute(f'SELECT messageID, timestamp FROM urls WHERE url = "{url}"').fetchone()
-    if url_data == None:
-        url_data = (None, None)
-    return url_data
+    def add_repost(self, url: str, message: discord.Message):
+        self.connection.execute(
+            sql_queries["add_repost"],
+            {"messageID": message.id, "channelID": message.channel.id, "memberID": message.author.id, "url": url},
+        )
 
-def get_emoji_str(guild: discord.Guild) -> Union[str, discord.Emoji]:
-    return databases[guild.id].execute("SELECT emoji FROM emoji").fetchone()[0]    
+    def remove_repost(self, url: str, message: discord.Message):
+        self.connection.execute(sql_queries["remove_repost"], {"messageID": message.id, "url": url})
 
-def get_discord_emoji(guild: discord.Guild, bot: discord.Client) -> discord.Emoji:
-    # Get emoji string from database
-    emoji_str = get_emoji_str(guild)
-    # Attempt to correlate with custom emoji
-    for emoji in bot.emojis:
-        if emoji.name == emoji_str:
-            return emoji
-    else:
-        try:
-            return emoji_library.EMOJI_ALIAS_UNICODE_ENGLISH[f":{emoji_str}:"]
-        except:
-            raise ValueError(f"{emoji_str} not found in client's emojis or unicode.")
+    @property
+    def emoji_str(self) -> str:
+        return self.connection.execute(sql_queries["get_emoji"]).fetchone()[0]
 
-def add_member(member: discord.Member, guild: discord.Guild):
-    databases[guild.id].execute(
-        "INSERT INTO members (ID, name) VALUES (:ID, :name)",
-        {"ID": member.id, "name": member.name},
-    )
+    @emoji_str.setter
+    def set_emoji_str(self, emoji_str: str):
+        self.connection.execute(sql_queries["set_emoji"], {"emoji": emoji_str})
+
+    @property
+    def emoji(self) -> discord.Emoji:
+        """Save self._emoji to not need to search on every query."""
+        # Get emoji string from database
+        emoji_str = self.emoji_str
+        # Compare name of emoji to saved emoji
+        if not (type(self._emoji) == discord.Emoji and self._emoji.name == emoji_str) or (
+            type(self._emoji) == str
+            and self._emoji == emoji_library.EMOJI_ALIAS_UNICODE_ENGLISH.get(f":{emoji_str}:", None)
+        ):
+            # If nothing matches, try to find matching discord or unicode emoji
+            for emoji in self.bot.emojis:
+                if emoji.name == emoji_str:
+                    self._emoji = emoji
+            else:
+                try:
+                    self._emoji = emoji_library.EMOJI_ALIAS_UNICODE_ENGLISH[f":{emoji_str}:"]
+                except:
+                    raise ValueError(f"{emoji_str} not found in bot's emojis or unicode.")
+        return self._emoji
+
+    def commit(self):
+        self.connection.commit()
+
+    def __del__(self):
+        """Close connection on deletion"""
+        self.connection.close()

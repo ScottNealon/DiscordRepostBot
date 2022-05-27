@@ -5,22 +5,27 @@ CREATE TABLE updates(
 );
 CREATE TABLE prefix(prefix VARCHAR NOT NULL);
 CREATE TABLE active(active INT NOT NULL);
-CREATE TABLE blacklistedChannels(channelID INT NOT NULL);
+CREATE TABLE blacklistedChannels(id INT NOT NULL);
 CREATE TABLE emoji(emoji VARCHAR NOT NULL);
 CREATE TABLE urls(
-    url VARCHAR NOT NULL,
+    url VARCHAR NOT NULL PRIMARY KEY,
     messageID INT NOT NULL,
-    timestamp FLOAT NOT NULL,
-    PRIMARY KEY (url)
+    channelID INT NOT NULL,
+    timestamp FLOAT NOT NULL
 );
-CREATE TABLE members(
-    ID INT NOT NULL,
-    name VARCHAR NOT NULL,
-    PRIMARY KEY (ID)
+CREATE TABLE members(id INT NOT NULL PRIMARY KEY);
+CREATE TABLE reposts(
+    messageID INT NOT NULL,
+    channelID INT NOT NULL,
+    memberID INT NOT NULL,
+    url VARCHAR NOT NULL,
+    FOREIGN KEY (memberID) REFERENCES members(id),
+    FOREIGN KEY (url) REFERENCES urls(url),
+    PRIMARY KEY (messageID, channelID)
 );
 /* Populate tables */
 INSERT INTO version (version)
-VALUES (:current_database_version);
+VALUES (:newest_version);
 INSERT INTO updates (oldestUpdate, lastUpdate)
 VALUES (:now, :now);
 INSERT INTO prefix (prefix)

@@ -1,0 +1,1 @@
+SELECT lastUpdate FROM updates;

@@ -11,7 +11,7 @@ def main():
     dir_path = os.path.dirname(os.path.realpath(__file__))
     token_path = os.path.join(dir_path, "bot_token.env")
     with open(token_path, "r") as token_file:
-        repost_bot.bot.run(token_file.read())
+        repost_bot.repost_bot.run(token_file.read())
 
 
 if __name__ == "__main__":

@@ -1,0 +1,1 @@
+INSERT INTO urls (url, messageID, channelID, timestamp) VALUES (:url, :messageID, :channelID, :timestamp)
