@@ -1,1 +1,2 @@
-SELECT id FROM members;
+SELECT id
+FROM members;

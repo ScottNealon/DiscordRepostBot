@@ -1,1 +1,2 @@
-INSERT INTO members (id) VALUES (:id);
+INSERT INTO members (id)
+VALUES (:id);

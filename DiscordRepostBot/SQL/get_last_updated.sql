@@ -1,1 +1,2 @@
-SELECT lastUpdate FROM updates;
+SELECT lastUpdate
+FROM updates;

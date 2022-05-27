@@ -1,1 +1,2 @@
-INSERT INTO blacklistedChannels (id) VALUES (:blacklistedChannel);
+INSERT INTO blacklistedChannels (id)
+VALUES (:blacklistedChannel);

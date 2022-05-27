@@ -1,1 +1,3 @@
-DELETE FROM reposts WHERE messageID = :messageID, url = :url;
+DELETE FROM reposts
+WHERE messageID = :messageID,
+    url = :url;

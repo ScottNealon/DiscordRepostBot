@@ -1,1 +1,2 @@
-DELETE FROM blacklistedChannels WHERE id = :id;
+DELETE FROM blacklistedChannels
+WHERE id = :id;

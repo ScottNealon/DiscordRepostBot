@@ -1,1 +1,2 @@
-SELECT active FROM active;
+SELECT active
+FROM active;

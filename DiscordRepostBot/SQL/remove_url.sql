@@ -1,1 +1,2 @@
-DELETE FROM urls WHERE url = :url;
+DELETE FROM urls
+WHERE url = :url;

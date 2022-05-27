@@ -1,1 +1,2 @@
-SELECT id FROM blacklistedChannels;
+SELECT id
+FROM blacklistedChannels;
