@@ -5,6 +5,7 @@ messages when a duplicate URL is sent to a discord server.
 
 Author: Scott Nealon
 """
+import asyncio
 import logging
 from enum import Enum
 
@@ -24,9 +25,12 @@ class URL_STATUS(Enum):
 
 
 class RepostBot(discord.ext.commands.Bot):
+
+    ready = False
+
     def __init__(self):
         self.guild_databases: dict[int, guild_database.GuildDatabase] = {}
-        intents = discord.Intents(messages=True, guilds=True, members=True)
+        intents = discord.Intents(messages=True, message_content=True, guilds=True, members=True)
         super().__init__(intents=intents)
 
     async def update_database(self, guild: discord.Guild):
@@ -149,16 +153,17 @@ async def on_ready():
         repost_bot.guild_databases[guild] = guild_database.GuildDatabase(guild, repost_bot)
         await repost_bot.update_database(guild)
 
+    repost_bot.ready = True
     logger.info("on_ready() complete.")
 
 
 @repost_bot.event
 async def on_message(message: discord.Message):
-    # Do nothing if inactive in server
-    if not repost_bot.guild_databases[message.guild].active:
-        return
-    # Do not trigger on bots
-    if message.author.bot:
+    # Don't do anything until ready
+    while not repost_bot.ready:
+        await asyncio.sleep(1)
+    # Do nothing if inactive in server, or on a bot
+    if not repost_bot.guild_databases[message.guild].active or message.author.bot:
         return
     updated = await repost_bot.review_message(message)
     if updated:
@@ -172,6 +177,8 @@ async def on_message(message: discord.Message):
 
 @repost_bot.event
 async def on_member_join(member: discord.Member):
+    while not repost_bot.ready:
+        await asyncio.sleep(1)
     repost_bot.guild_databases[member.guild].add_member(member)
 
 
