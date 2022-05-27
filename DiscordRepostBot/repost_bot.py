@@ -68,7 +68,9 @@ class RepostBot(discord.ext.commands.Bot):
             logger.info(f"Reading messages in {guild}/#{channel}")
             # Iterate across all messages in channel since last updated
             try:
-                async for message in channel.history(after=last_updated, limit=None, oldest_first=True):
+                async for message in channel.history(
+                    after=last_updated + dt.timedelta(microseconds=1), limit=None, oldest_first=True
+                ):
                     await self.review_message(message)
             # Catch error incase unable to access channel
             except discord.Forbidden:
