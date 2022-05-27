@@ -15,14 +15,15 @@ import guild_database
 
 logger = logging.getLogger(__name__)
 
+
 class URL_STATUS(Enum):
     NEW = 0
     REPOST = 1
     REVERSE_REPOST = 2
     ALREADY_REPORTED = 3
 
-class RepostBot(discord.ext.commands.Bot):
 
+class RepostBot(discord.ext.commands.Bot):
     def __init__(self):
         self.guild_databases: dict[int, guild_database.GuildDatabase] = {}
         intents = discord.Intents(messages=True, guilds=True, members=True)
@@ -71,16 +72,12 @@ class RepostBot(discord.ext.commands.Bot):
             # Catch error incase unable to access channel
             except discord.Forbidden:
                 logger.warning(f"{guild}/#{channel} cannot be accessed.")
-        
 
     async def review_message(self, message: discord.Message) -> bool:
         """bool : Reviews individual message to check for repost, responds TRUE if database updated"""
         # Skip any message from self, bot, or starting with recognized command
         updated = False
-        if not (
-            message.author == self
-            or message.author.bot
-        ):
+        if not (message.author == self or message.author.bot):
             # Search through every embed for a URL
             for embed in message.embeds:
                 if embed.url == discord.Embed.Empty:
@@ -98,7 +95,9 @@ class RepostBot(discord.ext.commands.Bot):
                     self.handle_reverse_repost(embed.url, message)
                     updated = True
                 elif url_status == URL_STATUS.ALREADY_REPORTED:
-                    logger.debug(f"Already reported URL found: {message.guild}/#{message.channel} at {message.created_at} by {message.author}: {embed.url}")
+                    logger.debug(
+                        f"Already reported URL found: {message.guild}/#{message.channel} at {message.created_at} by {message.author}: {embed.url}"
+                    )
                 else:
                     raise ValueError("Invalid URL status returned.")
         return updated
@@ -143,9 +142,9 @@ class RepostBot(discord.ext.commands.Bot):
         self.guild_databases[message.guild].add_repost(url, old_message)
 
 
-        
 # Create RepostBot and add events
 repost_bot = RepostBot()
+
 
 @repost_bot.event
 async def on_ready():
@@ -175,16 +174,23 @@ async def on_message(message: discord.Message):
     # Handle commands
     await repost_bot.process_commands(message)
 
+
+@repost_bot.event
+async def on_member_join(member: discord.Member):
+    repost_bot.guild_databases[member.guild].add_member(member)
+
+
 # TODO: Remove localized guild id
 @repost_bot.slash_command(guild_ids=[309873284697292802, 797250748869115904])
 async def ping(context: discord.ext.commands.Context):
     await context.respond("Pong.")
 
+
 @repost_bot.slash_command(guild_ids=[309873284697292802, 797250748869115904])
 async def repo(context: discord.ext.commands.Context):
     await context.respond("https://github.com/ScottNealon/DiscordRepostBot")
 
+
 @repost_bot.slash_command(guild_ids=[309873284697292802, 797250748869115904])
 async def privacy(context: discord.ext.commands.Context):
     await context.respond("https://github.com/ScottNealon/DiscordRepostBot/blob/main/PRIVACY.md")
-
