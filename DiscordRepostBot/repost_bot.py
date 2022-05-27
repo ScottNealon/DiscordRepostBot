@@ -77,7 +77,6 @@ class RepostBot(discord.ext.commands.Bot):
     async def review_message(self, message: discord.Message) -> bool:
         """bool : Reviews individual message to check for repost, responds TRUE if database updated"""
         # Skip any message from self, bot, or starting with recognized command
-        updated = False
         if not (message.author == self or message.author.bot):
             # Search through every embed for a URL
             for embed in message.embeds:
@@ -88,20 +87,16 @@ class RepostBot(discord.ext.commands.Bot):
                 # Deal with message according to status
                 if url_status == URL_STATUS.NEW:
                     self.handle_new_url(embed.url, message)
-                    updated = True
                 elif url_status == URL_STATUS.REPOST:
                     await self.mark_repost(embed.url, message)
-                    updated = True
                 elif url_status == URL_STATUS.REVERSE_REPOST:
                     self.handle_reverse_repost(embed.url, message)
-                    updated = True
                 elif url_status == URL_STATUS.ALREADY_REPORTED:
                     logger.debug(
                         f"Already reported URL found: {message.guild}/#{message.channel} at {message.created_at} by {message.author}: {embed.url}"
                     )
                 else:
                     raise ValueError("Invalid URL status returned.")
-        return updated
 
     def check_if_repost(self, url: str, message: discord.Message) -> int:
         """Returns whether URL is a repost or not"""
@@ -221,14 +216,13 @@ async def on_message(message: discord.Message):
         await asyncio.sleep(1)
     # Do nothing if inactive in server, or on a bot
     # TODO: Handle non-guild text channels
-    if message.author.bot or not repost_bot.guild_databases[message.guild].active:
-        return
-    updated = await repost_bot.review_message(message)
-    if updated:
-        message_timestamp = message.created_at.timestamp()
-        if message_timestamp > repost_bot.guild_databases[message.guild].last_updated:
-            repost_bot.guild_databases[message.guild].last_updated = message_timestamp
-        repost_bot.guild_databases[message.guild].commit()
+    if not message.author.bot and repost_bot.guild_databases[message.guild].active:
+        await repost_bot.review_message(message)
+    # Update last updated
+    message_timestamp = message.created_at.timestamp()
+    if message_timestamp > repost_bot.guild_databases[message.guild].last_updated:
+        repost_bot.guild_databases[message.guild].last_updated = message_timestamp
+    repost_bot.guild_databases[message.guild].commit()
 
 
 @repost_bot.event
