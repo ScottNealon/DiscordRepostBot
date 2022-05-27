@@ -20,8 +20,7 @@ CREATE TABLE reposts(
     memberID INT NOT NULL,
     url VARCHAR NOT NULL,
     FOREIGN KEY (memberID) REFERENCES members(id),
-    FOREIGN KEY (url) REFERENCES urls(url),
-    PRIMARY KEY (messageID, channelID)
+    FOREIGN KEY (url) REFERENCES urls(url)
 );
 /* Populate tables */
 INSERT INTO version (version)
