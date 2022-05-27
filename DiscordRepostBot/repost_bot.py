@@ -172,6 +172,9 @@ async def on_message(message: discord.Message):
             repost_bot.guild_databases[message.guild].last_updated = message_timestamp
         repost_bot.guild_databases[message.guild].commit()
 
+@repost_bot.event
+async def on_message_edit(old_message: discord.Message, new_message: discord.Message):
+    await on_message(new_message)
 
 @repost_bot.event
 async def on_member_join(member: discord.Member):
