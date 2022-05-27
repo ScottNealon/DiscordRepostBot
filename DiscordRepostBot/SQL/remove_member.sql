@@ -1,1 +1,0 @@
-DELETE FROM members WHERE id = :id;

@@ -118,9 +118,6 @@ class GuildDatabase:
     def add_member(self, member: discord.Member):
         self.connection.execute(sql_queries["add_member"], {"id": member.id})
 
-    def remove_member(self, member: discord.Member):
-        self.connection.execute(sql_queries["remove_member"], {"id": member.id})
-
     @property
     def urls(self):
         return self.connection.execute(sql_queries["get_urls"]).fetchall()

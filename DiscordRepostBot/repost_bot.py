@@ -43,11 +43,6 @@ class RepostBot(discord.ext.commands.Bot):
         for member in guild.members:
             if member.id not in database_member_ids:
                 self.guild_databases[guild].add_member(member)
-        # Remove all missing guild members from database
-        guild_member_ids = set(member.id for member in guild.members)
-        for database_member_id in database_member_ids:
-            if database_member_id not in guild_member_ids:
-                self.guild_databases[guild].remove_member(database_member_id)
 
     async def review_messages(self, guild: discord.Guild):
         """Reviews all messages in guild since last update"""
