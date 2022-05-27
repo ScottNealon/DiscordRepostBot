@@ -106,6 +106,8 @@ class RepostBot(discord.ext.commands.Bot):
         # Check if URL has been posted before
         try:
             message_id, channel_id, query_timestamp = self.guild_databases[message.guild].get_url(url)
+            # TODO: Add a case where the url has already been reported as a repost, not
+            # already reported as a unique url.
             if message_id == message.id and channel_id == message.channel.id:
                 return URL_STATUS.ALREADY_REPORTED
             elif query_timestamp < message.created_at.timestamp():
@@ -177,9 +179,11 @@ async def on_message(message: discord.Message):
             repost_bot.guild_databases[message.guild].last_updated = message_timestamp
         repost_bot.guild_databases[message.guild].commit()
 
+
 @repost_bot.event
 async def on_message_edit(old_message: discord.Message, new_message: discord.Message):
     await on_message(new_message)
+
 
 @repost_bot.event
 async def on_member_join(member: discord.Member):
@@ -206,6 +210,7 @@ async def repo(context: discord.ext.commands.Context):
 )
 async def privacy(context: discord.ext.commands.Context):
     await context.respond("https://github.com/ScottNealon/DiscordRepostBot/blob/main/PRIVACY.md")
+
 
 repost_commands = discord.SlashCommandGroup("repost", "Repost related commands")
 
