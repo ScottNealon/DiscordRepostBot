@@ -31,7 +31,7 @@ for file in sql_queries_dir.iterdir():
 
 class GuildDatabase:
 
-    newest_version = 8
+    newest_version = 10
 
     def __init__(self, guild: discord.Guild, bot: discord.ext.commands.Bot):
         self.guild = guild
@@ -80,14 +80,6 @@ class GuildDatabase:
     @property
     def version(self) -> int:
         return self.connection.execute(sql_queries["get_version"]).fetchone()[0]
-
-    @property
-    def prefix(self) -> str:
-        return self.connection.execute(sql_queries["get_prefix"]).fetchone()[0]
-
-    @prefix.setter
-    def set_prefix(self, prefix: str):
-        self.connection.execute(sql_queries["set_prefix"], {"prefix": prefix})
 
     @property
     def last_updated(self) -> float:

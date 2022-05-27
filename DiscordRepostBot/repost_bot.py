@@ -26,13 +26,7 @@ class RepostBot(discord.ext.commands.Bot):
     def __init__(self):
         self.guild_databases: dict[int, guild_database.GuildDatabase] = {}
         intents = discord.Intents(messages=True, guilds=True, members=True)
-        command_prefix = RepostBot.get_command_prefix
-        super().__init__(command_prefix=command_prefix, intents=intents)
-
-    @staticmethod
-    def get_command_prefix(bot: "RepostBot", message: discord.Message) -> str:
-        """Determines which prefix to use based on server preferences"""
-        return bot.guild_databases[message.guild].prefix
+        super().__init__(intents=intents)
 
     async def update_database(self, guild: discord.Guild):
         """Updates database since last online"""
@@ -86,7 +80,6 @@ class RepostBot(discord.ext.commands.Bot):
         if not (
             message.author == self
             or message.author.bot
-            or message.content.lower().startswith(self.guild_databases[message.guild].prefix)
         ):
             # Search through every embed for a URL
             for embed in message.embeds:
@@ -148,7 +141,7 @@ class RepostBot(discord.ext.commands.Bot):
         # Mark as repost
         await old_message.add_reaction(self.guild_databases[message.guild].emoji)
         self.guild_databases[message.guild].add_repost(url, old_message)
-        
+
 
         
 # Create RepostBot and add events
@@ -179,3 +172,19 @@ async def on_message(message: discord.Message):
         if message_timestamp > repost_bot.guild_databases[message.guild].last_updated:
             repost_bot.guild_databases[message.guild].set_last_updated(message_timestamp)
         repost_bot.guild_databases[message.guild].commit()
+    # Handle commands
+    await repost_bot.process_commands(message)
+
+# TODO: Remove localized guild id
+@repost_bot.slash_command(guild_ids=[309873284697292802, 797250748869115904])
+async def ping(context: discord.ext.commands.Context):
+    await context.respond("Pong.")
+
+@repost_bot.slash_command(guild_ids=[309873284697292802, 797250748869115904])
+async def repo(context: discord.ext.commands.Context):
+    await context.respond("https://github.com/ScottNealon/DiscordRepostBot")
+
+@repost_bot.slash_command(guild_ids=[309873284697292802, 797250748869115904])
+async def privacy(context: discord.ext.commands.Context):
+    await context.respond("https://github.com/ScottNealon/DiscordRepostBot/blob/main/PRIVACY.md")
+

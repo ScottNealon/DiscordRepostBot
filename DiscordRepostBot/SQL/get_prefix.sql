@@ -1,1 +1,0 @@
-SELECT prefix FROM prefix;
