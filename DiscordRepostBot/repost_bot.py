@@ -6,11 +6,13 @@ messages when a duplicate URL is sent to a discord server.
 Author: Scott Nealon
 """
 import asyncio
+import datetime as dt
 import logging
 from enum import Enum
 
 import discord
 import discord.ext.commands
+import humanize
 
 import guild_database
 
@@ -144,10 +146,56 @@ class RepostBot(discord.ext.commands.Bot):
         await old_message.add_reaction(self.guild_databases[message.guild].emoji)
         self.guild_databases[message.guild].add_repost(url, old_message)
 
-    def find_original_message_link(self, guild: discord.Guild, url: str) -> str:
-        """Returns link to the original message that contained the URL"""
-        message_id, channel_id, _ = repost_bot.guild_databases[guild].get_url(url)
-        return f"https://discord.com/channels/{guild.id}/{channel_id}/{message_id}"
+    @staticmethod
+    def original_message_link(guild_id: int, channel_id: int, message_id: int) -> str:
+        return f"https://discord.com/channels/{guild_id}/{channel_id}/{message_id}"
+
+    def message_context_markdown(
+        self, guild: discord.Guild, message_id: int, channel_id: int, member_id: int, timestamp: float, *args
+    ):
+        """Returns human readable context for message"""
+        humanized_delta_time = humanize.naturaltime(dt.datetime.now() - dt.datetime.fromtimestamp(timestamp))
+        author: discord.Member = guild.get_member(member_id)
+        author_name = author.name if author else "Unknown Member"
+        channel: discord.ChannelType = guild.get_channel(channel_id)
+        channel_name = f"#{channel.name}" if channel else "Unknown Channel"
+        orignal_message_link = self.original_message_link(guild.id, channel_id, message_id)
+        return f"{humanized_delta_time} by {author_name} in [{channel_name}]({orignal_message_link})"
+
+    def create_url_query_embed(self, guild: discord.Guild, url: str) -> discord.Embed:
+        original = self.guild_databases[guild].get_url(url)
+        if original == None:
+            raise ValueError("URL not found in database.")
+        # Get all previous reposts
+        reposts = self.guild_databases[guild].get_reposts(url)
+        # Create content
+        description_lines = [
+            f"Originally posted {self.message_context_markdown(guild, *original)}",
+            ""
+        ]
+        if len(reposts) == 0:
+            description_lines.append("No one has reposted this link. Congradulation!")
+        else:
+            description_lines.append(f"This URL has been reposted {len(reposts)} times:")
+            for i, repost in enumerate(reposts):
+                description_lines.append(f"{i+1}: {self.message_context_markdown(guild, *repost)}")
+        # Limit total length
+        description_string = "\n".join(description_lines)
+        if len(description_string) > 4096:
+            last_url = len(description_lines) + 1
+            while len(description_string) > 4096 - 5:
+                last_url -= 1
+                description_string = "\n".join(description_lines[:last_url])
+            description_string += "\n..."
+        # Create embed
+        embed = discord.Embed(title=url, description=description_string, color=discord.Colour.blurple())
+        # Add users image if possible
+        author = guild.get_member(original["memberID"])
+        if author:
+            author_image = author.guild_avatar if author.guild_avatar else author.avatar
+            if author_image:
+                embed.set_thumbnail(url=author_image.url)
+        return embed
 
 
 # Create RepostBot and add events
@@ -226,7 +274,11 @@ async def original(
     context: discord.ext.commands.Context,
     url: discord.Option(str),
 ):
-    await context.respond(repost_bot.find_original_message_link(context.guild, url))
+    try:
+        embed = repost_bot.create_url_query_embed(context.guild, url)
+        await context.respond(embed=embed)
+    except ValueError:
+        await context.respond(f"ERROR: Unable to find previous post of {url}", ephemeral=True)
 
 
 repost_bot.add_application_command(repost_commands)
@@ -234,18 +286,15 @@ repost_bot.add_application_command(repost_commands)
 
 @repost_bot.message_command(name="Original Post", guild_ids=[309873284697292802, 797250748869115904])
 async def orginal_post(context: discord.ext.commands.Context, message: discord.Message):
-    responses = {}
+    responded = False
     for embed in message.embeds:
         if embed.url == discord.Embed.Empty:
             continue
-        url_status = repost_bot.check_if_repost(embed.url, message)
-        if url_status == URL_STATUS.REPOST:
-            responses[embed.url] = repost_bot.find_original_message_link(context.guild, embed.url)
-    if len(responses) > 0:
-        # TODO: Make this into a fancy embed response
-        await context.respond(
-            f"Original posts for URLs found on {message.jump_url} :\n\n"
-            + "\n".join(f"{url} : {message_link}" for url, message_link in responses.items())
-        )
-    else:
-        await context.respond(f"ERROR: No reposts founds on message {message.jump_url} .", ephemeral=True)
+        try:
+            embed = repost_bot.create_url_query_embed(context.guild, embed.url)
+            await context.respond(embed=embed)
+            responded = True
+        except ValueError:
+            pass
+    if not responded:
+        await context.respond(f"ERROR: No reposts founds on message.", ephemeral=True)
