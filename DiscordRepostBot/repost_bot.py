@@ -172,7 +172,8 @@ async def on_message(message: discord.Message):
     while not repost_bot.ready:
         await asyncio.sleep(1)
     # Do nothing if inactive in server, or on a bot
-    if not repost_bot.guild_databases[message.guild].active or message.author.bot:
+    # TODO: Handle non-guild text channels
+    if message.author.bot or not repost_bot.guild_databases[message.guild].active:
         return
     updated = await repost_bot.review_message(message)
     if updated:
