@@ -83,7 +83,7 @@ class GuildDatabase:
 
     @property
     def last_updated(self) -> float:
-        return self.connection.execute(sql_queries["get_last_updated"]).fetchone()[0]
+        return self.connection.execute(sql_queries["get_last_updated"]).fetchone()['lastUpdate']
 
     @property
     def last_updated_datetime(self) -> datetime:
