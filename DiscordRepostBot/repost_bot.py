@@ -28,10 +28,10 @@ class RepostBot(discord.ext.commands.Bot):
 
     ready = False
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.guild_databases: dict[int, guild_database.GuildDatabase] = {}
         intents = discord.Intents(messages=True, message_content=True, guilds=True, members=True)
-        super().__init__(intents=intents)
+        super().__init__(intents=intents, **kwargs)
 
     async def update_database(self, guild: discord.Guild):
         """Updates database since last online"""
@@ -142,7 +142,7 @@ class RepostBot(discord.ext.commands.Bot):
 
 
 # Create RepostBot and add events
-repost_bot = RepostBot()
+repost_bot = RepostBot(debug_guilds=[309873284697292802, 797250748869115904])
 
 
 @repost_bot.event
