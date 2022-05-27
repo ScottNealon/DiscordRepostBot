@@ -171,6 +171,9 @@ class GuildDatabase:
     def remove_repost(self, url: str, message: discord.Message):
         self.connection.execute(sql_queries["remove_repost"], {"messageID": message.id, "url": url})
 
+    def get_reposts(self, url: str):
+        return self.connection.execute(sql_queries["get_reposts"], {"url": url}).fetchall()
+
     @property
     def emoji_str(self) -> str:
         return self.connection.execute(sql_queries["get_emoji"]).fetchone()[0]
