@@ -201,3 +201,19 @@ async def repo(context: discord.ext.commands.Context):
 )
 async def privacy(context: discord.ext.commands.Context):
     await context.respond("https://github.com/ScottNealon/DiscordRepostBot/blob/main/PRIVACY.md")
+
+repost_commands = discord.SlashCommandGroup("repost", "Repost related commands")
+
+
+@repost_commands.command(
+    description="Provides link to first message in server to post URL.",
+    guild_ids=[309873284697292802, 797250748869115904],
+)
+async def original(
+    context: discord.ext.commands.Context,
+    url: discord.Option(str),
+):
+    await context.respond(repost_bot.find_original_message_link(context.guild, url))
+
+
+repost_bot.add_application_command(repost_commands)
