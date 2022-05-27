@@ -169,10 +169,8 @@ async def on_message(message: discord.Message):
     if updated:
         message_timestamp = message.created_at.timestamp()
         if message_timestamp > repost_bot.guild_databases[message.guild].last_updated:
-            repost_bot.guild_databases[message.guild].set_last_updated(message_timestamp)
+            repost_bot.guild_databases[message.guild].last_updated = message_timestamp
         repost_bot.guild_databases[message.guild].commit()
-    # Handle commands
-    await repost_bot.process_commands(message)
 
 
 @repost_bot.event
