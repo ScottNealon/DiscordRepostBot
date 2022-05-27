@@ -140,6 +140,11 @@ class RepostBot(discord.ext.commands.Bot):
         await old_message.add_reaction(self.guild_databases[message.guild].emoji)
         self.guild_databases[message.guild].add_repost(url, old_message)
 
+    def find_original_message_link(self, guild: discord.Guild, url: str) -> str:
+        """Returns link to the original message that contained the URL"""
+        message_id, channel_id, _ = repost_bot.guild_databases[guild].get_url(url)
+        return f"https://discord.com/channels/{guild.id}/{channel_id}/{message_id}"
+
 
 # Create RepostBot and add events
 repost_bot = RepostBot(debug_guilds=[309873284697292802, 797250748869115904])
@@ -217,3 +222,22 @@ async def original(
 
 
 repost_bot.add_application_command(repost_commands)
+
+
+@repost_bot.message_command(name="Original Post", guild_ids=[309873284697292802, 797250748869115904])
+async def orginal_post(context: discord.ext.commands.Context, message: discord.Message):
+    responses = {}
+    for embed in message.embeds:
+        if embed.url == discord.Embed.Empty:
+            continue
+        url_status = repost_bot.check_if_repost(embed.url, message)
+        if url_status == URL_STATUS.REPOST:
+            responses[embed.url] = repost_bot.find_original_message_link(context.guild, embed.url)
+    if len(responses) > 0:
+        # TODO: Make this into a fancy embed response
+        await context.respond(
+            f"Original posts for URLs found on {message.jump_url} :\n\n"
+            + "\n".join(f"{url} : {message_link}" for url, message_link in responses.items())
+        )
+    else:
+        await context.respond(f"ERROR: No reposts founds on message {message.jump_url} .", ephemeral=True)
