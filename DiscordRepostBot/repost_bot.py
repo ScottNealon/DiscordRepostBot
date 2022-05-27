@@ -6,8 +6,6 @@ messages when a duplicate URL is sent to a discord server.
 Author: Scott Nealon
 """
 import logging
-import time
-from datetime import datetime
 from enum import Enum
 
 import discord
