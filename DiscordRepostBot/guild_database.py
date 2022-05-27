@@ -90,7 +90,7 @@ class GuildDatabase:
         return datetime.fromtimestamp(self.last_updated)
 
     @last_updated.setter
-    def set_last_updated(self, last_updated: float):
+    def last_updated(self, last_updated: float):
         self.connection.execute(sql_queries["set_last_updated"], {"lastUpdate": last_updated})
 
     @property
