@@ -164,10 +164,7 @@ class RepostBot(discord.ext.commands.Bot):
         # Get all previous reposts
         reposts = self.guild_databases[guild].get_reposts(url)
         # Create content
-        description_lines = [
-            f"Originally posted {self.message_context_markdown(guild, *original)}",
-            ""
-        ]
+        description_lines = [f"Originally posted {self.message_context_markdown(guild, *original)}", ""]
         if len(reposts) == 0:
             description_lines.append("No one has reposted this link. Congradulation!")
         else:
