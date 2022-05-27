@@ -74,6 +74,7 @@ class GuildDatabase:
         now = time.time()
         for command in sql_queries["create_database"].split(";"):
             self.connection.execute(command, {"newest_version": self.newest_version, "now": now})
+        self.connection.commit()
 
     ### PROPERTIES ###
 
@@ -83,7 +84,7 @@ class GuildDatabase:
 
     @property
     def last_updated(self) -> float:
-        return self.connection.execute(sql_queries["get_last_updated"]).fetchone()['lastUpdate']
+        return self.connection.execute(sql_queries["get_last_updated"]).fetchone()[0]
 
     @property
     def last_updated_datetime(self) -> datetime:
