@@ -189,11 +189,15 @@ async def ping(context: discord.ext.commands.Context):
     await context.respond("Pong.")
 
 
-@repost_bot.slash_command(guild_ids=[309873284697292802, 797250748869115904])
+@repost_bot.slash_command(
+    description="Posts a link to the bot's GitHub repository.", guild_ids=[309873284697292802, 797250748869115904]
+)
 async def repo(context: discord.ext.commands.Context):
     await context.respond("https://github.com/ScottNealon/DiscordRepostBot")
 
 
-@repost_bot.slash_command(guild_ids=[309873284697292802, 797250748869115904])
+@repost_bot.slash_command(
+    description="Posts a link to the bot's privacy policy.", guild_ids=[309873284697292802, 797250748869115904]
+)
 async def privacy(context: discord.ext.commands.Context):
     await context.respond("https://github.com/ScottNealon/DiscordRepostBot/blob/main/PRIVACY.md")
