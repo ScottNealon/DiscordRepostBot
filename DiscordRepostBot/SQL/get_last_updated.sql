@@ -1,2 +1,0 @@
-SELECT lastUpdate
-FROM updates;

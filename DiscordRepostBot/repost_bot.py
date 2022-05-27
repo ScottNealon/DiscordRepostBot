@@ -43,18 +43,16 @@ class RepostBot(discord.ext.commands.Bot):
 
     def update_members(self, guild: discord.Guild):
         """Adds and removes members from database"""
-        # Retrieve all members from database
-        database_member_ids = self.guild_databases[guild].members
         # Add all guild members to database
         for member in guild.members:
-            if member.id not in database_member_ids:
+            if not self.guild_databases[guild].is_member(member.id):
                 self.guild_databases[guild].add_member(member)
 
     async def review_messages(self, guild: discord.Guild):
         """Reviews all messages in guild since last update"""
         last_updated = self.guild_databases[guild].last_updated_datetime
         logger.info(f"Reading messages in {guild} since {humanize.precisedelta(dt.datetime.now() - last_updated)} ago.")
-        blacklisted_channels = self.guild_databases[guild].blacklisted_channels
+        blacklisted_channels = self.guild_databases[guild].get_blacklisted_channels()
         # Iterate across all text channels in guild
         for channel in guild.channels:
             # Skip non-text channels
@@ -104,18 +102,16 @@ class RepostBot(discord.ext.commands.Bot):
         """Returns whether URL is a repost or not"""
         # Check if URL has been posted before
         try:
-            message_id, channel_id, member_id, query_timestamp = self.guild_databases[message.guild].get_url(url)
-            # TODO: Add a case where the url has already been reported as a repost, not
-            # already reported as a unique url.
-            if message_id == message.id and channel_id == message.channel.id:
+            original = self.guild_databases[message.guild].get_originals(url=url)[0]
+        except IndexError:
+            return URL_STATUS.NEW
+        else:
+            if original["messageID"] == message.id and original["channelID"] == message.channel.id:
                 return URL_STATUS.ALREADY_REPORTED
-            elif query_timestamp < message.created_at.timestamp():
+            elif original["timestamp"] < message.created_at.timestamp():
                 return URL_STATUS.REPOST
             else:
                 return URL_STATUS.REVERSE_REPOST
-        # Errors if looking for url that doesn't exist
-        except TypeError:
-            return URL_STATUS.NEW
 
     @staticmethod
     def message_content_log_str(message: discord.Message, url: str) -> str:
@@ -123,7 +119,7 @@ class RepostBot(discord.ext.commands.Bot):
 
     def handle_new_url(self, url: str, message: discord.Message):
         logger.debug(f"New URL found: {self.message_content_log_str(message, url)}")
-        self.guild_databases[message.guild].add_url(url, message)
+        self.guild_databases[message.guild].add_original(url, message)
 
     async def mark_repost(self, url: str, message: discord.Message):
         logger.debug(f"Reposted URL found: {self.message_content_log_str(message, url)}")
@@ -133,12 +129,10 @@ class RepostBot(discord.ext.commands.Bot):
     async def handle_reverse_repost(self, url: str, message: discord.Message):
         logger.debug(f"Reverse repost URL found: {self.message_content_log_str(message, url)}")
         # Update database with new message
-        self.guild_databases[message.guild].set_url(url, message)
+        self.guild_databases[message.guild].update_original(url, message)
         # Retrieve old message
-        old_message_id, old_channel_id, old_member_id, old_query_timestamp = self.guild_databases[
-            message.guild
-        ].get_url(url)
-        old_message: discord.Message = await message.guild.get_channel(old_channel_id).fetch_message(old_message_id)
+        original = self.guild_databases[message.guild].get_originals(url=url)[0]
+        old_message: discord.Message = await message.guild.get_channel(original["channelID"]).fetch_message(original["messageID"])
         # Mark as repost
         await old_message.add_reaction(self.guild_databases[message.guild].emoji)
         self.guild_databases[message.guild].add_repost(url, old_message)
@@ -148,7 +142,7 @@ class RepostBot(discord.ext.commands.Bot):
         return f"https://discord.com/channels/{guild_id}/{channel_id}/{message_id}"
 
     def message_context_markdown(
-        self, guild: discord.Guild, message_id: int, channel_id: int, member_id: int, timestamp: float, *args
+        self, guild: discord.Guild, url: str, message_id: int, channel_id: int, member_id: int, timestamp: float
     ):
         """Returns human readable context for message"""
         humanized_delta_time = humanize.naturaltime(dt.datetime.now() - dt.datetime.fromtimestamp(timestamp))
@@ -160,11 +154,12 @@ class RepostBot(discord.ext.commands.Bot):
         return f"{humanized_delta_time} by {author_name} in [{channel_name}]({orignal_message_link})"
 
     def create_url_query_embed(self, guild: discord.Guild, url: str) -> discord.Embed:
-        original = self.guild_databases[guild].get_url(url)
-        if original == None:
+        try:
+            original = self.guild_databases[guild].get_originals(url=url)[0]
+        except IndexError:
             raise ValueError("URL not found in database.")
         # Get all previous reposts
-        reposts = self.guild_databases[guild].get_reposts(url)
+        reposts = self.guild_databases[guild].get_reposts(url=url)
         # Create content
         description_lines = [f"Originally posted {self.message_context_markdown(guild, *original)}", ""]
         if len(reposts) == 0:

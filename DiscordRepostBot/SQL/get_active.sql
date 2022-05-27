@@ -1,2 +1,0 @@
-SELECT active
-FROM active;
