@@ -52,8 +52,8 @@ class RepostBot(discord.ext.commands.Bot):
 
     async def review_messages(self, guild: discord.Guild):
         """Reviews all messages in guild since last update"""
-        logger.info(f"Updating channels in {guild}.")
         last_updated = self.guild_databases[guild].last_updated_datetime
+        logger.info(f"Reading messages in {guild} since {humanize.precisedelta(dt.datetime.now() - last_updated)} ago.")
         blacklisted_channels = self.guild_databases[guild].blacklisted_channels
         # Iterate across all text channels in guild
         for channel in guild.channels:
@@ -65,7 +65,7 @@ class RepostBot(discord.ext.commands.Bot):
             if channel.id in blacklisted_channels:
                 logger.info(f"{guild}/#{channel} is blacklisted.")
                 continue
-            logger.info(f"{guild}/#{channel}")
+            logger.info(f"Reading messages in {guild}/#{channel}")
             # Iterate across all messages in channel since last updated
             try:
                 async for message in channel.history(after=last_updated, limit=None, oldest_first=True):
