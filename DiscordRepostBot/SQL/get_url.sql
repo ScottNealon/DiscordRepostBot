@@ -1,1 +1,6 @@
-SELECT messageID, channelID, timestamp FROM urls WHERE url = :url;
+SELECT messageID,
+    channelID,
+    memberID,
+    timestamp
+FROM urls
+WHERE url = :url;

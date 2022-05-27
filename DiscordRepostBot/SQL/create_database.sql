@@ -6,13 +6,15 @@ CREATE TABLE updates(
 CREATE TABLE active(active INT NOT NULL);
 CREATE TABLE blacklistedChannels(id INT NOT NULL);
 CREATE TABLE emoji(emoji VARCHAR NOT NULL);
+CREATE TABLE members(id INT NOT NULL PRIMARY KEY);
 CREATE TABLE urls(
     url VARCHAR NOT NULL PRIMARY KEY,
     messageID INT NOT NULL,
     channelID INT NOT NULL,
-    timestamp FLOAT NOT NULL
+    memberID INT NOT NULL,
+    timestamp FLOAT NOT NULL,
+    FOREIGN KEY (memberID) REFERENCES members(id)
 );
-CREATE TABLE members(id INT NOT NULL PRIMARY KEY);
 CREATE TABLE reposts(
     messageID INT NOT NULL,
     channelID INT NOT NULL,

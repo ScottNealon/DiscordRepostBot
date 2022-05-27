@@ -105,7 +105,7 @@ class RepostBot(discord.ext.commands.Bot):
         """Returns whether URL is a repost or not"""
         # Check if URL has been posted before
         try:
-            message_id, channel_id, query_timestamp = self.guild_databases[message.guild].get_url(url)
+            message_id, channel_id, member_id, query_timestamp = self.guild_databases[message.guild].get_url(url)
             # TODO: Add a case where the url has already been reported as a repost, not
             # already reported as a unique url.
             if message_id == message.id and channel_id == message.channel.id:
@@ -136,7 +136,9 @@ class RepostBot(discord.ext.commands.Bot):
         # Update database with new message
         self.guild_databases[message.guild].set_url(url, message)
         # Retrieve old message
-        old_message_id, old_channel_id, old_query_timestamp = self.guild_databases[message.guild].get_url(url)
+        old_message_id, old_channel_id, old_member_id, old_query_timestamp = self.guild_databases[
+            message.guild
+        ].get_url(url)
         old_message: discord.Message = await message.guild.get_channel(old_channel_id).fetch_message(old_message_id)
         # Mark as repost
         await old_message.add_reaction(self.guild_databases[message.guild].emoji)

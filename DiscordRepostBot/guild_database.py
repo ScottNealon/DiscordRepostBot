@@ -31,7 +31,7 @@ for file in sql_queries_dir.iterdir():
 
 class GuildDatabase:
 
-    newest_version = 10
+    newest_version = 12
 
     def __init__(self, guild: discord.Guild, bot: discord.ext.commands.Bot):
         self.guild = guild
@@ -132,6 +132,7 @@ class GuildDatabase:
                 "url": url,
                 "messageID": message.id,
                 "channelID": message.channel.id,
+                "memberID": message.author.id,
                 "timestamp": message.created_at.timestamp(),
             },
         )
@@ -143,6 +144,7 @@ class GuildDatabase:
                 "url": url,
                 "messageID": message.id,
                 "channelID": message.channel.id,
+                "memberID": message.author.id,
                 "timestamp": message.created_at.timestamp(),
             },
         )

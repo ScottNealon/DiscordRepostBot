@@ -1,1 +1,8 @@
-INSERT INTO urls (url, messageID, channelID, timestamp) VALUES (:url, :messageID, :channelID, :timestamp)
+INSERT INTO urls (url, messageID, channelID, memberID, timestamp)
+VALUES (
+        :url,
+        :messageID,
+        :channelID,
+        :memberID,
+        :timestamp
+    )
