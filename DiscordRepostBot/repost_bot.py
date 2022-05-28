@@ -154,34 +154,36 @@ class RepostBot(discord.ext.commands.Bot):
         return f"{humanized_delta_time} by {author_name} in [{channel_name}]({orignal_message_link})"
 
     def create_url_query_embed(self, guild: discord.Guild, url: str) -> discord.Embed:
+        # Record properties of original message
+        description = "**Original Post**\n"
         try:
             original = self.guild_databases[guild].get_originals(url=url)[0]
         except IndexError:
             raise ValueError("URL not found in database.")
-        # Get all previous reposts
+        description += self.message_context_markdown(guild, *original)
+        # Record properties of repost
+        description += "\n\n**Reposts**\n"
         reposts = self.guild_databases[guild].get_reposts(url=url)
-        # Create content
-        description_lines = [f"Originally posted {self.message_context_markdown(guild, *original)}", ""]
+        repost_lines = []
         if len(reposts) == 0:
-            description_lines.append("No one has reposted this link. Congradulation!")
+            repost_lines.append("No one has reposted this link. Congradulation!")
         else:
-            description_lines.append(f"This URL has been reposted {len(reposts)} times:")
-            for i, repost in enumerate(reposts):
-                description_lines.append(f"{i+1}: {self.message_context_markdown(guild, *repost)}")
+            repost_lines.append(f"This URL has been reposted {len(reposts)} times:")
+            for repost in reposts:
+                repost_lines.append(f"• {self.message_context_markdown(guild, *repost)}")
         # Limit total length
-        description_string = "\n".join(description_lines)
-        if len(description_string) > 4096:
-            last_url = len(description_lines) + 1
-            while len(description_string) > 4096 - 5:
-                last_url -= 1
-                description_string = "\n".join(description_lines[:last_url])
-            description_string += "\n..."
+        repost_lenght = len(description) + sum([len(line) + 2 for line in repost_lines]) - 2
+        shortening = repost_lenght > 4096
+        if shortening:
+            while repost_lenght > 4096 - 5:
+                repost_lenght -= len(repost_lines.pop()) - 2
+        description += "\n".join(repost_lines) + ("\n..." if shortening else "")
         # Create embed
-        embed = discord.Embed(title=url, description=description_string, color=discord.Colour.blurple())
+        embed = discord.Embed(title=url, description=description, color=discord.Colour.blurple())
         # Add users image if possible
         author = guild.get_member(original["memberID"])
         if author:
-            author_image = author.guild_avatar if author.guild_avatar else author.avatar
+            author_image = author.display_avatar
             if author_image:
                 embed.set_thumbnail(url=author_image.url)
         return embed
