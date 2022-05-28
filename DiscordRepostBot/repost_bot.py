@@ -259,7 +259,7 @@ repost_commands = discord.SlashCommandGroup("repost", "Repost related commands")
 
 
 @repost_commands.command(
-    description="Provides link to first message in server to post URL.",
+    description="Provides link to original message in server to post URL.",
     guild_ids=[309873284697292802, 797250748869115904],
 )
 async def original(
@@ -276,7 +276,7 @@ async def original(
 repost_bot.add_application_command(repost_commands)
 
 
-@repost_bot.message_command(name="Original Post", guild_ids=[309873284697292802, 797250748869115904])
+@repost_bot.message_command(name="Analyze Message", guild_ids=[309873284697292802, 797250748869115904])
 async def orginal_post(context: discord.ext.commands.Context, message: discord.Message):
     responded = False
     for embed in message.embeds:
@@ -289,4 +289,4 @@ async def orginal_post(context: discord.ext.commands.Context, message: discord.M
         except ValueError:
             pass
     if not responded:
-        await context.respond(f"ERROR: No reposts founds on message.", ephemeral=True)
+        await context.respond(f"No URLs founds on message.", ephemeral=True)
