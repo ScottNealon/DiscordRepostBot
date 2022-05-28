@@ -153,6 +153,13 @@ class RepostBot(discord.ext.commands.Bot):
         orignal_message_link = self.original_message_link(guild.id, channel_id, message_id)
         return f"• {humanized_delta_time} by {author_name} in [{channel_name}]({orignal_message_link})"
 
+    def user_repost_readable(self, guild: discord.Guild, url: str, message_id: int, channel_id: int, member_id: int, timestamp: float):
+        humanized_delta_time = humanize.naturaltime(dt.datetime.now() - dt.datetime.fromtimestamp(timestamp))
+        channel: discord.ChannelType = guild.get_channel(channel_id)
+        channel_name = f"#{channel.name}" if channel else "Unknown Channel"
+        orignal_message_link = self.original_message_link(guild.id, channel_id, message_id)
+        return f"• {humanized_delta_time} in [{channel_name}]({orignal_message_link}): {url}"
+
     def create_url_query_embed(self, guild: discord.Guild, url: str) -> discord.Embed:
         # Record properties of original message
         description = "**Original Post**\n"
@@ -305,3 +312,29 @@ async def user_statistics(context: discord.ext.commands.Context, member: discord
     embed.add_field(name="Reposts", value=len(reposts))
     embed.add_field(name="Repost Rate", value=f"{100 * len(reposts) / (len(originals) + len(reposts)):.1f}%")
     await context.respond(embed=embed)
+
+@repost_bot.user_command(name="User Reposts", guild_ids=[309873284697292802, 797250748869115904])
+async def user_reposts(context: discord.ext.commands.Context, member: discord.Member):
+    embeds = []
+    reposts = repost_bot.guild_databases[context.guild].get_reposts(member_id=member.id)
+    # Convert reposts into readable lines
+    reposts_readable = [repost_bot.user_repost_readable(context.guild, *repost) for repost in reposts]
+    # Seperate reposts into seperate embeds
+    while reposts_readable and len(embeds) < 10:
+        embed_reposts_readable = ["**Reposts**"]
+        embed_reposts_len = 0
+        while reposts_readable and embed_reposts_len + len(reposts_readable[-1]) < 4000 + 2:
+            embed_reposts_readable.append(reposts_readable.pop())
+            embed_reposts_len += len(embed_reposts_readable[-1]) + 2
+        # Deal with overflow
+        if reposts_readable and len(embeds) == 10:
+            reposts_readable = reposts_readable[:-2]
+            remaining_reposts = len(reposts_readable) + 2
+            reposts_readable.append(f"(Plus {remaining_reposts} additional older reposts)")
+        # Create embed
+        description = "\n".join(embed_reposts_readable)
+        embed = discord.Embed(title=member.display_name, description=description, color=discord.Colour.blurple())
+        if member.display_avatar:
+            embed.set_thumbnail(url=member.display_avatar)
+        embeds.append(embed)
+    await context.respond(embeds=embeds, ephemeral=True)
