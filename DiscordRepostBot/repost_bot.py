@@ -292,7 +292,7 @@ async def orginal_post(context: discord.ext.commands.Context, message: discord.M
         await context.respond(f"No URLs founds on message.", ephemeral=True)
 
 @repost_bot.user_command(name="User Statistics", guild_ids=[309873284697292802, 797250748869115904])
-async def user_reposts(context: discord.ext.commands.Context, member: discord.Member):
+async def user_statistics(context: discord.ext.commands.Context, member: discord.Member):
     # Get all urls and reposts from user
     originals = repost_bot.guild_databases[context.guild].get_originals(member_id=member.id)
     reposts = repost_bot.guild_databases[context.guild].get_reposts(member_id=member.id)
