@@ -141,7 +141,7 @@ class RepostBot(discord.ext.commands.Bot):
     def original_message_link(guild_id: int, channel_id: int, message_id: int) -> str:
         return f"https://discord.com/channels/{guild_id}/{channel_id}/{message_id}"
 
-    def message_context_markdown(
+    def url_repost_readable(
         self, guild: discord.Guild, url: str, message_id: int, channel_id: int, member_id: int, timestamp: float
     ):
         """Returns human readable context for message"""
@@ -151,7 +151,7 @@ class RepostBot(discord.ext.commands.Bot):
         channel: discord.ChannelType = guild.get_channel(channel_id)
         channel_name = f"#{channel.name}" if channel else "Unknown Channel"
         orignal_message_link = self.original_message_link(guild.id, channel_id, message_id)
-        return f"{humanized_delta_time} by {author_name} in [{channel_name}]({orignal_message_link})"
+        return f"• {humanized_delta_time} by {author_name} in [{channel_name}]({orignal_message_link})"
 
     def create_url_query_embed(self, guild: discord.Guild, url: str) -> discord.Embed:
         # Record properties of original message
@@ -160,7 +160,7 @@ class RepostBot(discord.ext.commands.Bot):
             original = self.guild_databases[guild].get_originals(url=url)[0]
         except IndexError:
             raise ValueError("URL not found in database.")
-        description += self.message_context_markdown(guild, *original)
+        description += self.url_repost_readable(guild, *original)
         # Record properties of repost
         description += "\n\n**Reposts**\n"
         reposts = self.guild_databases[guild].get_reposts(url=url)
@@ -170,7 +170,7 @@ class RepostBot(discord.ext.commands.Bot):
         else:
             repost_lines.append(f"This URL has been reposted {len(reposts)} times:")
             for repost in reposts:
-                repost_lines.append(f"• {self.message_context_markdown(guild, *repost)}")
+                repost_lines.append({self.url_repost_readable(guild, *repost)})
         # Limit total length
         repost_lenght = len(description) + sum([len(line) + 2 for line in repost_lines]) - 2
         shortening = repost_lenght > 4096
