@@ -212,8 +212,10 @@ async def on_message(message: discord.Message):
         await asyncio.sleep(1)
     # Do nothing if inactive in server, or on a bot
     # TODO: Handle non-guild text channels
-    if not message.author.bot and repost_bot.guild_databases[message.guild].active:
-        await repost_bot.review_message(message)
+    if message.author.bot or not repost_bot.guild_databases[message.guild].active:
+        return
+    # Read message
+    await repost_bot.review_message(message)
     # Update last updated
     message_timestamp = message.created_at.timestamp()
     if message_timestamp > repost_bot.guild_databases[message.guild].last_updated:
